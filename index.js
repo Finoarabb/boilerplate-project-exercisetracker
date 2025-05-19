@@ -7,9 +7,12 @@ const mongoose = require("mongoose");
 const user = require("./models/user");
 const exercise = require("./models/exercise");
 mongoose
-  .connect(process.env.mongodb)
+  .connect(process.env.MONGO_URI,{
+    useNewurlParser:true,
+    useUnifiedTopology:true
+  })
   .then(() => console.log("MongoDB Connected"))
-  .catch((err) => console.log("Mongodb : ", err));
+  .catch((err) => console.log("Mongodb connection error: ", err));
 
 app.use(cors());
 app.use(express.static("public"));
