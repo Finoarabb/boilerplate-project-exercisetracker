@@ -43,51 +43,69 @@ app.get("/api/users", async (req, res) => {
 });
 
 app.post("/api/users/:_id/exercises", async (req, res) => {
-  const userid = await user.findOne({ _id: req.body[":_id"] });
-  if (!userid) {
-    res.json({ error: "User Not Found" });
-    return;
-  }
-  data = {
-    userId: userid._id,
-    username: userid.username,
-    description: req.body.description,
-    duration: parseInt(req.body.duration),
-    date: req.body.date ? new Date(req.body.date) : new Date(),
-  };
   try {
-    const exercises = await exercise.create(data);
-    data._id = data.userId;
-    data.date = data.date.toDateString();
-    res.json(data);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    const userid = await user.findById(req.params._id);
+    if (!userid) return res.status(404).json({ error: "User Not Found" });
+
+    const date = req.body.date ? new Date(req.body.date) : new Date();
+
+    const newExercise = await exercise.create({
+      userId: userid._id,
+      description: req.body.description,
+      duration: parseInt(req.body.duration),
+      date: date,
+    });
+
+    res.json({
+      _id: userid._id,
+      username: userid.username,
+      description: newExercise.description,
+      duration: newExercise.duration,
+      date: newExercise.date.toDateString(), // FCC expects this format
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
+
 
 app.get("/api/users/:_id/logs", async (req, res) => {
-  const userid = await user.findOne({ _id: req.params._id });
-  if (!userid) {
-    res.json({ error: "User Not Found" });
-    return;
+  try {
+    const userid = await user.findById(req.params._id);
+    if (!userid) return res.status(404).json({ error: "User Not Found" });
+
+    let { from, to, limit } = req.query;
+
+    let filter = { userId: userid._id };
+    let exercises = await exercise.find(filter).select("description duration date");
+
+    if (from) {
+      const fromDate = new Date(from);
+      exercises = exercises.filter(e => new Date(e.date) >= fromDate);
+    }
+    if (to) {
+      const toDate = new Date(to);
+      exercises = exercises.filter(e => new Date(e.date) <= toDate);
+    }
+    if (limit) {
+      exercises = exercises.slice(0, parseInt(limit));
+    }
+
+    res.json({
+      _id: userid._id,
+      username: userid.username,
+      count: exercises.length,
+      log: exercises.map(e => ({
+        description: e.description,
+        duration: e.duration,
+        date: e.date.toDateString(),
+      })),
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
-  let exercises = await exercise
-    .find({ userId: userid._id })
-    .select("description duration date")
-
-
-  const log = {
-    _id: userid._id,
-    username: userid.username,
-    count: exercises.length,
-    log: exercises.map(e => ({
-      description: e.description,
-      duration: e.duration,
-      date: e.date.toDateString()
-    })),
-  };
-  res.json(log);
 });
+
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log("Your app is listening on port " + listener.address().port);
 });
